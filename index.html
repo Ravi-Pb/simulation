@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ta2O5 Synaptic Device — Interactive Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0A0E12;
+    --panel: #12181F;
+    --panel-edge: #1E2731;
+    --amber: #FFAA33;
+    --amber-dim: #4A3418;
+    --amber-glow: rgba(255,170,51,0.55);
+    --cyan: #52D9C9;
+    --cyan-dim: #1B3B38;
+    --text: #E8E2D6;
+    --muted: #7A8290;
+    --danger: #E8604C;
+  }
+  *{ box-sizing: border-box; }
+  html,body{ margin:0; padding:0; background:var(--bg); color:var(--text); }
+  body{
+    font-family: 'IBM Plex Mono', monospace;
+    -webkit-font-smoothing: antialiased;
+    min-height:100vh;
+    position:relative;
+  }
+  .scanlines{
+    pointer-events:none; position:fixed; inset:0; z-index:50;
+    background: repeating-linear-gradient(
+      to bottom, rgba(255,255,255,0.018) 0px, rgba(255,255,255,0.018) 1px,
+      transparent 1px, transparent 3px
+    );
+    mix-blend-mode: overlay;
+  }
+  .vignette{
+    pointer-events:none; position:fixed; inset:0; z-index:49;
+    background: radial-gradient(ellipse at 50% 0%, rgba(0,0,0,0) 0%, rgba(0,0,0,0.35) 100%);
+  }
+
+  header{
+    max-width: 1160px; margin: 0 auto; padding: 60px 24px 32px;
+    border-bottom: 1px solid var(--panel-edge);
+    background:
+      radial-gradient(ellipse 900px 300px at 15% 0%, rgba(255,170,51,0.06), transparent 60%),
+      radial-gradient(ellipse 700px 260px at 100% 20%, rgba(82,217,201,0.05), transparent 60%);
+  }
+  .header-grid{ display:grid; grid-template-columns: 1.35fr 1fr; gap: 40px; align-items:center; }
+  @media (max-width: 860px){ .header-grid{ grid-template-columns: 1fr; } .pulse-signature{ height:100px; } }
+  .eyebrow{
+    font-size: 11px; letter-spacing: 0.18em; color: var(--muted); text-transform: uppercase;
+    display:flex; align-items:center; gap:8px; margin-bottom: 16px;
+  }
+  .dot{ width:7px; height:7px; border-radius:50%; background: var(--amber); box-shadow: 0 0 8px var(--amber-glow); animation: blink 2.2s infinite; }
+  @keyframes blink{ 0%,100%{opacity:1;} 50%{opacity:0.25;} }
+  h1{
+    font-family:'Space Grotesk', sans-serif; font-weight:700; font-size: clamp(30px, 5vw, 48px);
+    margin: 0 0 12px; letter-spacing: -0.015em; line-height:1.05;
+  }
+  h1 span{ color: var(--amber); text-shadow: 0 0 22px var(--amber-glow); }
+  .sub{ color: var(--muted); font-size: 13.5px; max-width: 620px; line-height:1.65; }
+  .cite{
+    color: var(--muted); font-size: 11.5px; margin-top: 18px; padding-top:14px;
+    border-top: 1px solid var(--panel-edge); max-width:620px; line-height:1.6;
+  }
+  .cite b{ color:var(--text); font-weight:600; }
+
+  /* ---- signature element: live pulse-train visual ---- */
+  .pulse-signature{
+    position:relative; height:150px; border:1px solid var(--panel-edge); border-radius:8px;
+    background: #0D1218; overflow:hidden;
+    box-shadow: inset 0 0 40px rgba(0,0,0,0.4);
+  }
+  .pulse-signature .ps-label{
+    position:absolute; top:10px; left:14px; font-size:10px; letter-spacing:0.14em; color:var(--muted);
+    text-transform:uppercase; z-index:2;
+  }
+  .pulse-baseline{ position:absolute; left:14px; right:14px; bottom:28px; height:1px; background:#232C36; }
+  .pulse-bar{
+    position:absolute; bottom:28px; width:3px; border-radius:2px 2px 0 0;
+    background: linear-gradient(to top, var(--amber), rgba(255,170,51,0.15));
+    box-shadow: 0 0 10px var(--amber-glow);
+    transform-origin:bottom; animation: pulseBeat 3.2s ease-in-out infinite;
+  }
+  @keyframes pulseBeat{
+    0%, 100%{ transform: scaleY(0.18); opacity:0.5; }
+    50%{ transform: scaleY(1); opacity:1; }
+  }
+  .pulse-scan{
+    position:absolute; top:0; bottom:0; width:1px;
+    background: linear-gradient(to bottom, transparent, var(--cyan), transparent);
+    box-shadow: 0 0 12px rgba(82,217,201,0.65);
+    animation: scanMove 4.8s linear infinite;
+  }
+  @keyframes scanMove{ 0%{ left:2%; } 100%{ left:98%; } }
+  .pulse-caption{
+    position:absolute; bottom:8px; left:14px; right:14px; display:flex; justify-content:space-between;
+    font-size:10px; color:var(--muted); letter-spacing:0.05em;
+  }
+
+  main{ max-width: 1100px; margin: 0 auto; padding: 36px 24px 80px; }
+
+  .panel{
+    background: var(--panel); border: 1px solid var(--panel-edge); border-radius: 8px;
+    padding: 24px 26px 28px; margin-bottom: 22px;
+    position: relative;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.02) inset, 0 12px 28px -18px rgba(0,0,0,0.6);
+    transition: border-color .2s ease, transform .2s ease, box-shadow .2s ease;
+  }
+  .panel:hover{
+    border-color: #2A3540;
+    transform: translateY(-2px);
+    box-shadow: 0 1px 0 rgba(255,255,255,0.02) inset, 0 18px 34px -16px rgba(0,0,0,0.7);
+  }
+  .panel::before{
+    content:''; position:absolute; top:0; left:16px; right:16px; height:1px;
+    background: linear-gradient(to right, transparent, rgba(255,170,51,0.35), transparent);
+  }
+  .ch-label{
+    font-size: 11px; letter-spacing:0.14em; color: var(--amber); text-transform:uppercase;
+    display:flex; align-items:center; justify-content:space-between; margin-bottom: 4px;
+  }
+  .ch-title{ font-family:'Space Grotesk', sans-serif; font-weight:600; font-size:19px; color:var(--text); margin: 2px 0 4px; }
+  .ch-desc{ color: var(--muted); font-size: 12.5px; line-height:1.55; margin-bottom:16px; max-width: 640px; }
+
+  .hero-grid{ display:grid; grid-template-columns: 1.4fr 1fr; gap: 22px; align-items:start; }
+  @media (max-width: 800px){ .hero-grid, .quad{ grid-template-columns: 1fr; } }
+
+  canvas{ display:block; width:100%; height:auto; background: #0D1218; border-radius:4px; border:1px solid var(--panel-edge); }
+
+  .controls{ display:flex; flex-direction:column; gap:16px; }
+  .field label{ display:block; font-size:11px; color:var(--muted); letter-spacing:0.06em; text-transform:uppercase; margin-bottom:6px; }
+  .field .val{ color:var(--amber); font-weight:600; }
+  input[type=range]{
+    -webkit-appearance:none; width:100%; height:3px; background: var(--panel-edge); border-radius:2px; outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; width:14px; height:14px; border-radius:50%;
+    background: var(--amber); box-shadow: 0 0 10px var(--amber-glow); cursor:pointer; border: 2px solid #0A0E12;
+  }
+  .segmented{ display:flex; gap:6px; }
+  .segmented button{
+    flex:1; background: #0D1218; color: var(--muted); border:1px solid var(--panel-edge);
+    padding: 9px 6px; font-family:'IBM Plex Mono', monospace; font-size:12px; border-radius:5px; cursor:pointer;
+    transition: all .15s ease;
+  }
+  .segmented button:hover{ border-color:#3A4550; color:var(--text); }
+  .segmented button.active{
+    background: var(--amber-dim); color: var(--amber); border-color: var(--amber);
+    box-shadow: 0 0 0 1px rgba(255,170,51,0.15), 0 4px 12px -6px var(--amber-glow);
+  }
+
+  .readout-row{ display:flex; gap:14px; flex-wrap:wrap; margin-top:4px; }
+  .readout{
+    background:#0D1218; border:1px solid var(--panel-edge); border-radius:5px; padding:11px 14px; flex:1; min-width:120px;
+    transition: border-color .2s ease;
+  }
+  .readout:hover{ border-color:#33404B; }
+  .readout .k{ font-size:10px; color:var(--muted); letter-spacing:0.08em; text-transform:uppercase; }
+  .readout .v{ font-size: 21px; color: var(--amber); font-weight:600; margin-top:3px; font-variant-numeric: tabular-nums; }
+  .readout .v.cyan{ color: var(--cyan); }
+  .readout .u{ font-size: 11px; color: var(--muted); margin-left:4px; }
+
+  .quad{ display:grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+
+  .eqbox{
+    font-size:12.5px; color: var(--muted); background:#0D1218; border:1px solid var(--panel-edge);
+    border-radius:4px; padding: 10px 13px; margin-top:14px; line-height:1.6;
+  }
+  .eqbox b{ color: var(--text); }
+
+  .note{
+    border-left: 3px solid var(--danger); background: rgba(232,96,76,0.07); color: var(--text);
+    font-size:12.5px; padding: 12px 16px; border-radius: 0 4px 4px 0; margin-top:16px; line-height:1.6;
+  }
+  .note b{ color: var(--danger); }
+
+  footer{
+    max-width:1100px; margin: 0 auto; padding: 20px 24px 60px; color: var(--muted); font-size:11.5px;
+    border-top: 1px solid var(--panel-edge);
+  }
+  footer a{ color: var(--amber); text-decoration:none; }
+</style>
+</head>
+<body>
+<div class="scanlines"></div>
+<div class="vignette"></div>
+
+<header>
+  <div class="header-grid">
+    <div>
+      <div class="eyebrow"><span class="dot"></span> SIMULATION ONLY · NO PHYSICAL DEVICE CONNECTED</div>
+      <h1>Ta<sub>2</sub>O<sub>5</sub> Synaptic Device <span>— Interactive Lab</span></h1>
+      <div class="sub">
+        A live instrument-panel reconstruction of the dual-metal-gate Ta2O5/IGZO synaptic transistor:
+        drag the controls on each channel to explore amplitude-dependent EPSC, paired-pulse facilitation,
+        long-term potentiation, and synaptic depression — using the equations and reported data from the paper.
+      </div>
+      <div class="cite">Adapted from <b>"Power-Constrained Ta2O5 Synaptic Device for Scalable Neuromorphic Architecture with Enhanced Performance,"</b> presented at ICNARI-3, NIT Patna.</div>
+    </div>
+    <div class="pulse-signature">
+      <div class="ps-label">Ch. Monitor — Live Spike Train</div>
+      <div class="pulse-baseline"></div>
+      <div class="pulse-bar" style="left:8%;  height:60px; animation-delay:0.0s;"></div>
+      <div class="pulse-bar" style="left:19%; height:44px; animation-delay:0.3s;"></div>
+      <div class="pulse-bar" style="left:30%; height:78px; animation-delay:0.6s;"></div>
+      <div class="pulse-bar" style="left:41%; height:36px; animation-delay:0.9s;"></div>
+      <div class="pulse-bar" style="left:52%; height:66px; animation-delay:1.2s;"></div>
+      <div class="pulse-bar" style="left:63%; height:50px; animation-delay:1.5s;"></div>
+      <div class="pulse-bar" style="left:74%; height:84px; animation-delay:1.8s;"></div>
+      <div class="pulse-bar" style="left:85%; height:40px; animation-delay:2.1s;"></div>
+      <div class="pulse-scan"></div>
+      <div class="pulse-caption"><span>0 ms</span><span>50 ms</span></div>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- CH1: HERO — EPSC / STP -->
+  <div class="panel">
+    <div class="ch-label"><span>CH1 · AMPLITUDE-DEPENDENT EPSC (STP)</span><span id="ch1-tag">Vg = 2.0 V</span></div>
+    <div class="ch-title">Excitatory Post-Synaptic Current</div>
+    <div class="ch-desc">A single gate pulse (1 ms) drives protons toward the IGZO channel, forming an Electric Double Layer.
+      Peak EPSC scales with gate amplitude — reported by the paper as 75.07 nA at 1.5&nbsp;V rising to 773.477 nA at 4.0&nbsp;V.</div>
+
+    <div class="hero-grid">
+      <canvas id="canvas-epsc" width="640" height="300"></canvas>
+      <div class="controls">
+        <div class="field">
+          <label>Gate voltage V<sub>g</sub> &nbsp;<span class="val" id="vg-val">2.0 V</span></label>
+          <input type="range" id="vg-slider" min="1.5" max="4.0" step="0.1" value="2.0">
+        </div>
+        <div class="readout-row">
+          <div class="readout"><div class="k">Peak EPSC</div><div class="v" id="epsc-peak">—</div></div>
+          <div class="readout"><div class="k">Spike Energy</div><div class="v cyan" id="epsc-energy">—</div></div>
+        </div>
+        <div class="eqbox"><b>Eq.1</b> &nbsp;E = I<sub>dm</sub> × V<sub>d</sub> × T<sub>pulse</sub> &nbsp;(V<sub>d</sub> fixed at 0.5 V)</div>
+        <div class="note"><b>Note —</b> the paper states peak-EPSC energy as "0.310 pJ" in Results but "0.31 nJ" in the Conclusion — a 1000× unit mismatch in the source text. This readout follows Eq.1 literally, so treat the absolute units with caution.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quad grid: CH2, CH3, CH4 -->
+  <div class="quad">
+
+    <!-- CH2: PPF -->
+    <div class="panel">
+      <div class="ch-label"><span>CH2 · PAIRED-PULSE FACILITATION</span><span id="ch2-tag">1 ms ON</span></div>
+      <div class="ch-title">PPF Index</div>
+      <div class="ch-desc">Two identical pulses close together: the second produces a larger EPSC because residual ions haven't relaxed. Reported peak: 565.4% at 1 ms.</div>
+      <canvas id="canvas-ppf" width="520" height="230"></canvas>
+      <div class="controls" style="margin-top:14px;">
+        <div class="field">
+          <label>Pulse width T<sub>ON</sub></label>
+          <div class="segmented" id="ton-seg">
+            <button data-ton="1" class="active">1 ms</button>
+            <button data-ton="2">2 ms</button>
+            <button data-ton="3">3 ms</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>Interval time &nbsp;<span class="val" id="interval-val">1.0 ms</span></label>
+          <input type="range" id="interval-slider" min="1" max="10" step="0.1" value="1">
+        </div>
+        <div class="readout-row">
+          <div class="readout"><div class="k">PPF Index</div><div class="v" id="ppf-val">—</div></div>
+        </div>
+        <div class="eqbox"><b>Eq.2</b> &nbsp;PPF = (A₂ / A₁) × 100%</div>
+      </div>
+    </div>
+
+    <!-- CH3: LTP -->
+    <div class="panel">
+      <div class="ch-label"><span>CH3 · POTENTIATION</span><span id="ch3-tag">1 ms interval</span></div>
+      <div class="ch-title">LTP Strength Index</div>
+      <div class="ch-desc">Repeated pulses at 1 V, 250 Hz. Shorter intervals leave less time for charge relaxation → stronger synaptic weight (Table II).</div>
+      <canvas id="canvas-ltp" width="520" height="230"></canvas>
+      <div class="controls" style="margin-top:14px;">
+        <div class="field">
+          <label>Pulse interval</label>
+          <div class="segmented" id="ltp-seg">
+            <button data-interval="1" class="active">1 ms</button>
+            <button data-interval="2">2 ms</button>
+            <button data-interval="3">3 ms</button>
+            <button data-interval="4">4 ms (ref)</button>
+          </div>
+        </div>
+        <div class="readout-row">
+          <div class="readout"><div class="k">Final Drain I</div><div class="v" id="ltp-current">—</div></div>
+          <div class="readout"><div class="k">LTP Strength</div><div class="v" id="ltp-strength">—</div></div>
+        </div>
+        <div class="eqbox"><b>Eq.3</b> &nbsp;LTP% = (I<sub>d</sub>(Δt) − I<sub>d0</sub>) / I<sub>d</sub>(Δt) × 100%</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- CH4: Depression (full width) -->
+  <div class="panel">
+    <div class="ch-label"><span>CH4 · DEPRESSION</span><span id="ch4-tag">200 Hz · duty 0.5</span></div>
+    <div class="ch-title">Depression Strength Index</div>
+    <div class="ch-desc">Frequency-dependent forgetting: repeated pulses reduce drain current toward a steady state. Table III, all combinations reproduced exactly via Eq.4.</div>
+
+    <div class="hero-grid">
+      <canvas id="canvas-dep" width="640" height="260"></canvas>
+      <div class="controls">
+        <div class="field">
+          <label>Frequency</label>
+          <div class="segmented" id="freq-seg">
+            <button data-freq="200" class="active">200 Hz</button>
+            <button data-freq="250">250 Hz</button>
+            <button data-freq="400">400 Hz</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>Duty cycle</label>
+          <div class="segmented" id="duty-seg">
+            <button data-duty="0.25">0.25</button>
+            <button data-duty="0.5" class="active">0.5</button>
+            <button data-duty="0.75">0.75</button>
+          </div>
+        </div>
+        <div class="readout-row">
+          <div class="readout"><div class="k">I max</div><div class="v" id="dep-imax">—</div></div>
+          <div class="readout"><div class="k">I min</div><div class="v" id="dep-imin">—</div></div>
+          <div class="readout"><div class="k">DSI</div><div class="v cyan" id="dep-dsi">—</div></div>
+        </div>
+        <div class="eqbox"><b>Eq.4</b> &nbsp;DSI% = (I<sub>max</sub> − I<sub>min</sub>) / I<sub>max</sub> × 100%</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CH5: STDP train pulses (full width) -->
+  <div class="panel">
+    <div class="ch-label"><span>CH5 · STDP PULSE-TRAIN POTENTIATION</span><span id="ch5-tag">Ton 4ms / Toff 1ms</span></div>
+    <div class="ch-title">Drain Current Under Repeated Presynaptic Spikes</div>
+    <div class="ch-desc">A train of 1 V, 200 Hz presynaptic pulses is applied with varying ON/OFF timing (Fig. 6). Each
+      spike leaves behind un-relaxed protons, so consecutive peaks climb toward a saturating final value — shorter
+      OFF windows leave less time to relax, producing the strongest potentiation.</div>
+
+    <div class="hero-grid">
+      <canvas id="canvas-stdp" width="640" height="280"></canvas>
+      <div class="controls">
+        <div class="field">
+          <label>ON / OFF timing</label>
+          <div class="segmented" id="stdp-seg">
+            <button data-ton="4" data-toff="1" data-final="3.744" data-unit="µA" class="active">4ms / 1ms</button>
+            <button data-ton="3" data-toff="2" data-final="2.338" data-unit="µA">3ms / 2ms</button>
+            <button data-ton="2" data-toff="3" data-final="1.0377" data-unit="µA">2ms / 3ms</button>
+            <button data-ton="1" data-toff="4" data-final="173.827" data-unit="nA">1ms / 4ms</button>
+          </div>
+        </div>
+        <div class="readout-row">
+          <div class="readout"><div class="k">Final Peak I<sub>d</sub></div><div class="v" id="stdp-final">—</div></div>
+          <div class="readout"><div class="k">Pulses / 50 ms</div><div class="v cyan" id="stdp-npulse">—</div></div>
+        </div>
+        <div class="eqbox">Reported saturating peaks — <b>Ton4/Toff1: 3.744 µA</b>, <b>Ton3/Toff2: 2.338 µA</b>,
+          <b>Ton2/Toff3: 1.0377 µA</b>, <b>Ton1/Toff4: 173.827 nA</b> — over a 50 ms window at 200 Hz.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CH6: Conductance potentiation-depression (Fig 8) -->
+  <div class="panel">
+    <div class="ch-label"><span>CH6 · CONDUCTANCE MODULATION</span><span>Vg = 1 V</span></div>
+    <div class="ch-title">Potentiation ↔ Depression Cycle</div>
+    <div class="ch-desc">Repeated gate pulses raise channel conductance (potentiation) as protons accumulate; once
+      pulsing stops, slow relaxation of the electric double layer lets conductance decay back down (depression) —
+      the device's analogue of a biological synapse strengthening and forgetting (Fig. 8).</div>
+    <canvas id="canvas-cond" width="1000" height="240"></canvas>
+  </div>
+
+  <!-- CH7: Benchmark comparison (Table IV) -->
+  <div class="panel">
+    <div class="ch-label"><span>CH7 · LITERATURE BENCHMARK</span><span>Table IV</span></div>
+    <div class="ch-title">This Work vs. Reported IGZO-Based Synaptic Devices</div>
+    <div class="ch-desc">PPF index and energy-efficiency comparison against other published electrolyte materials.</div>
+    <div style="overflow-x:auto;">
+    <table id="bench-table" style="width:100%; border-collapse:collapse; font-size:12.5px;">
+      <thead>
+        <tr style="border-bottom:1px solid var(--panel-edge); color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; font-size:11px;">
+          <th style="text-align:left; padding:8px 10px;">Ref.</th>
+          <th style="text-align:left; padding:8px 10px;">Electrolyte</th>
+          <th style="text-align:left; padding:8px 10px;">Key Metrics</th>
+        </tr>
+      </thead>
+      <tbody id="bench-tbody"></tbody>
+    </table>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  Instrument-panel simulation built from the equations and tabulated data (Tables I–IV) reported in the source paper.
+  EPSC, PPF, and STDP-train traces are physically-motivated exponential fits anchored to the paper's summary numbers,
+  since raw time-series data wasn't published; LTP, depression, and benchmark readouts use the paper's table values
+  directly. Not a substitute for the original SILVACO ATLAS device simulation.
+</footer>
+
+<script>
+// ---------- shared helpers ----------
+function fmt(n, d=1){ return Number(n).toFixed(d); }
+
+function drawGrid(ctx, w, h, color){
+  ctx.clearRect(0,0,w,h);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1;
+  const cols = 12, rows = 6;
+  ctx.beginPath();
+  for(let i=0;i<=cols;i++){ const x = (w/cols)*i; ctx.moveTo(x,0); ctx.lineTo(x,h); }
+  for(let j=0;j<=rows;j++){ const y = (h/rows)*j; ctx.moveTo(0,y); ctx.lineTo(w,y); }
+  ctx.stroke();
+}
+
+function glowLine(ctx, pts, color, glow){
+  ctx.save();
+  ctx.shadowColor = glow;
+  ctx.shadowBlur = 10;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  pts.forEach(([x,y],i)=> i===0? ctx.moveTo(x,y) : ctx.lineTo(x,y));
+  ctx.stroke();
+  ctx.restore();
+}
+
+const AMBER = '#FFAA33', AMBER_GLOW='rgba(255,170,51,0.6)', AMBER_DIM='#2A2013';
+const CYAN = '#52D9C9', CYAN_GLOW='rgba(82,217,201,0.6)', CYAN_DIM='#132A28';
+
+// ================= CH1: EPSC / STP =================
+const c1 = document.getElementById('canvas-epsc');
+const ctx1 = c1.getContext('2d');
+const vgSlider = document.getElementById('vg-slider');
+const vgVal = document.getElementById('vg-val');
+const ch1Tag = document.getElementById('ch1-tag');
+
+const V_LOW=1.5, V_HIGH=4.0, I_LOW=75.07e-9, I_HIGH=773.477e-9;
+const K_EPSC = Math.log(I_HIGH/I_LOW)/(V_HIGH-V_LOW);
+
+function epscPeak(vg){ return I_LOW*Math.exp(K_EPSC*(vg-V_LOW)); }
+
+function epscTraceAt(t, pulseWidth, Ipeak, tauRise, tauDecay){
+  if(t<=pulseWidth) return Ipeak*(1-Math.exp(-t/tauRise));
+  const atOff = Ipeak*(1-Math.exp(-pulseWidth/tauRise));
+  return atOff*Math.exp(-(t-pulseWidth)/tauDecay);
+}
+
+function drawEPSC(){
+  const vg = parseFloat(vgSlider.value);
+  vgVal.textContent = vg.toFixed(1)+' V';
+  ch1Tag.textContent = 'Vg = '+vg.toFixed(1)+' V';
+  const Ipeak = epscPeak(vg);
+  const w=c1.width, h=c1.height;
+  drawGrid(ctx1, w, h, AMBER_DIM);
+  const N=200, tMax=0.025, pulseWidth=0.001;
+  const pts=[];
+  for(let i=0;i<N;i++){
+    const t = tMax*i/(N-1);
+    const I = epscTraceAt(t, pulseWidth, Ipeak, 0.0003, 0.004);
+    const x = (t/tMax)*w;
+    const y = h - (I/I_HIGH)*(h*0.9) - 8;
+    pts.push([x,y]);
+  }
+  glowLine(ctx1, pts, AMBER, AMBER_GLOW);
+
+  document.getElementById('epsc-peak').innerHTML = fmt(Ipeak*1e9,2)+'<span class="u">nA</span>';
+  const Vd=0.5, Tpulse=0.001;
+  const E = Ipeak*Vd*Tpulse; // Joules, per Eq.1 literally
+  document.getElementById('epsc-energy').innerHTML = fmt(E*1e12,1)+'<span class="u">pJ</span>';
+}
+vgSlider.addEventListener('input', drawEPSC);
+
+// ================= CH2: PPF =================
+const c2 = document.getElementById('canvas-ppf');
+const ctx2 = c2.getContext('2d');
+const intervalSlider = document.getElementById('interval-slider');
+const intervalVal = document.getElementById('interval-val');
+const ch2Tag = document.getElementById('ch2-tag');
+let currentTon = 1;
+const scaleByTon = {1:1.0, 2:0.62, 3:0.42};
+const tauPPF = 3.0;
+
+function ppfIndexModel(intervalMs, ton){
+  const A0 = (565.4-100)*scaleByTon[ton];
+  return 100 + A0*Math.exp(-(intervalMs-1)/tauPPF);
+}
+
+function drawPPF(){
+  const interval = parseFloat(intervalSlider.value);
+  intervalVal.textContent = interval.toFixed(1)+' ms';
+  ch2Tag.textContent = currentTon+' ms ON';
+  const ppf = ppfIndexModel(interval, currentTon);
+  document.getElementById('ppf-val').innerHTML = fmt(ppf,1)+'<span class="u">%</span>';
+
+  const w=c2.width, h=c2.height;
+  drawGrid(ctx2, w, h, AMBER_DIM);
+  // draw two pulses: bar heights represent A1 and A2 scaled by ppf ratio
+  const baseH = h*0.28;
+  const A2H = baseH * (ppf/100);
+  const barW = w*0.09;
+  const x1 = w*0.28, x2 = x1 + (interval/10)*(w*0.45) + barW;
+
+  // pulse 1
+  ctx2.save();
+  ctx2.shadowColor = AMBER_GLOW; ctx2.shadowBlur=8;
+  ctx2.fillStyle = AMBER;
+  ctx2.fillRect(x1, h-40-baseH, barW, baseH);
+  ctx2.restore();
+  ctx2.fillStyle = '#7A8290'; ctx2.font='11px IBM Plex Mono';
+  ctx2.fillText('A1', x1+barW/2-8, h-20);
+
+  // pulse 2
+  ctx2.save();
+  ctx2.shadowColor = CYAN_GLOW; ctx2.shadowBlur=10;
+  ctx2.fillStyle = CYAN;
+  ctx2.fillRect(x2, h-40-A2H, barW, A2H);
+  ctx2.restore();
+  ctx2.fillStyle = '#7A8290';
+  ctx2.fillText('A2', x2+barW/2-8, h-20);
+
+  ctx2.strokeStyle = '#2A3138'; ctx2.beginPath(); ctx2.moveTo(30,h-40); ctx2.lineTo(w-20,h-40); ctx2.stroke();
+}
+
+document.querySelectorAll('#ton-seg button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('#ton-seg button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    currentTon = parseInt(btn.dataset.ton);
+    drawPPF();
+  });
+});
+intervalSlider.addEventListener('input', drawPPF);
+
+// ================= CH3: LTP (Table II, direct) =================
+const c3 = document.getElementById('canvas-ltp');
+const ctx3 = c3.getContext('2d');
+const ch3Tag = document.getElementById('ch3-tag');
+const tableII = {
+  1: {current: 3.56, strength: 99.26},
+  2: {current: 2.05, strength: 98.92},
+  3: {current: 0.698, strength: 96.27},
+  4: {current: 0.026, strength: null}
+};
+let currentLtpInterval = 1;
+
+function drawLTP(){
+  ch3Tag.textContent = currentLtpInterval+' ms interval';
+  const d = tableII[currentLtpInterval];
+  document.getElementById('ltp-current').innerHTML = fmt(d.current,3)+'<span class="u">nA</span>';
+  document.getElementById('ltp-strength').innerHTML = (d.strength!==null? fmt(d.strength,2)+'%' : 'ref') ;
+
+  const w=c3.width, h=c3.height;
+  drawGrid(ctx3, w, h, AMBER_DIM);
+  const intervals=[1,2,3,4];
+  const maxCurrent = 3.56;
+  const pts = intervals.map((iv,i)=>{
+    const x = 50 + i*((w-90)/3);
+    const y = h-40 - (tableII[iv].current/maxCurrent)*(h*0.7);
+    return [x,y];
+  });
+  glowLine(ctx3, pts, AMBER, AMBER_GLOW);
+  intervals.forEach((iv,i)=>{
+    const [x,y]=pts[i];
+    const active = iv===currentLtpInterval;
+    ctx3.beginPath();
+    ctx3.fillStyle = active? CYAN : AMBER;
+    ctx3.arc(x,y, active?6:4, 0, Math.PI*2);
+    ctx3.fill();
+    ctx3.fillStyle='#7A8290'; ctx3.font='11px IBM Plex Mono';
+    ctx3.fillText(iv+'ms', x-10, h-18);
+  });
+}
+
+document.querySelectorAll('#ltp-seg button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('#ltp-seg button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    currentLtpInterval = parseInt(btn.dataset.interval);
+    drawLTP();
+  });
+});
+
+// ================= CH4: Depression (Table III, direct) =================
+const c4 = document.getElementById('canvas-dep');
+const ctx4 = c4.getContext('2d');
+const ch4Tag = document.getElementById('ch4-tag');
+const tableIII = {
+  200: {'0.25':{imax:87.33, imin:7.99, dsi:90.85}, '0.5':{imax:87.97, imin:7.19, dsi:91.82}, '0.75':{imax:87.97, imin:6.33, dsi:92.80}},
+  250: {'0.25':{imax:87.33, imin:7.69, dsi:91.19}, '0.5':{imax:87.97, imin:6.61, dsi:92.48}, '0.75':{imax:87.97, imin:5.49, dsi:93.75}},
+  400: {'0.25':{imax:87.33, imin:6.80, dsi:92.21}, '0.5':{imax:87.97, imin:4.91, dsi:94.41}, '0.75':{imax:87.97, imin:3.36, dsi:96.18}}
+};
+let currentFreq = 200, currentDuty = '0.5';
+
+function drawDep(){
+  ch4Tag.textContent = currentFreq+' Hz · duty '+currentDuty;
+  const d = tableIII[currentFreq][currentDuty];
+  document.getElementById('dep-imax').innerHTML = fmt(d.imax,2)+'<span class="u">nA</span>';
+  document.getElementById('dep-imin').innerHTML = fmt(d.imin,2)+'<span class="u">nA</span>';
+  document.getElementById('dep-dsi').innerHTML = fmt(d.dsi,2)+'<span class="u">%</span>';
+
+  const w=c4.width, h=c4.height;
+  drawGrid(ctx4, w, h, AMBER_DIM);
+  // simulate a decaying spike train from Imax to Imin
+  const N=12; const pts=[];
+  for(let i=0;i<N;i++){
+    const frac = i/(N-1);
+    const decay = d.imin + (d.imax-d.imin)*Math.exp(-frac*3.2);
+    const x = 30 + frac*(w-60);
+    const spikeTop = h-30 - (decay/d.imax)*(h*0.75);
+    pts.push([x, h-30]);
+    pts.push([x, spikeTop]);
+    pts.push([x, h-30]);
+  }
+  glowLine(ctx4, pts, AMBER, AMBER_GLOW);
+  // baseline for Imin
+  const yMin = h-30 - (d.imin/d.imax)*(h*0.75);
+  ctx4.strokeStyle = CYAN; ctx4.setLineDash([4,4]); ctx4.lineWidth=1.5;
+  ctx4.beginPath(); ctx4.moveTo(20,yMin); ctx4.lineTo(w-20,yMin); ctx4.stroke();
+  ctx4.setLineDash([]);
+  ctx4.fillStyle=CYAN; ctx4.font='11px IBM Plex Mono';
+  ctx4.fillText('I min steady-state', 26, yMin-6);
+}
+
+document.querySelectorAll('#freq-seg button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('#freq-seg button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    currentFreq = parseInt(btn.dataset.freq);
+    drawDep();
+  });
+});
+document.querySelectorAll('#duty-seg button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('#duty-seg button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    currentDuty = btn.dataset.duty;
+    drawDep();
+  });
+});
+
+// ================= CH5: STDP pulse train =================
+const c5 = document.getElementById('canvas-stdp');
+const ctx5 = c5.getContext('2d');
+const ch5Tag = document.getElementById('ch5-tag');
+let stdpTon = 4, stdpToff = 1, stdpFinal = 3.744, stdpUnit = 'µA';
+
+function drawSTDP(){
+  ch5Tag.textContent = 'Ton '+stdpTon+'ms / Toff '+stdpToff+'ms';
+  document.getElementById('stdp-final').innerHTML = fmt(stdpFinal, stdpFinal<10?3:1)+'<span class="u">'+stdpUnit+'</span>';
+
+  const w=c5.width, h=c5.height;
+  drawGrid(ctx5, w, h, AMBER_DIM);
+
+  const period = stdpTon + stdpToff; // ms
+  const windowMs = 50;
+  const nPulses = Math.floor(windowMs/period);
+  document.getElementById('stdp-npulse').textContent = nPulses;
+
+  const finalAbs = stdpUnit==='µA' ? stdpFinal : stdpFinal/1000; // normalize to µA
+  const pts=[];
+  for(let i=0;i<nPulses;i++){
+    const frac = (i+1)/nPulses; // climbs toward saturation
+    const peakHere = finalAbs*(1-Math.exp(-3*frac));
+    const tStart = i*period;
+    const x0 = (tStart/windowMs)*w;
+    const x1 = ((tStart+stdpTon*0.15)/windowMs)*w; // fast rise
+    const x2 = ((tStart+period)/windowMs)*w; // decays back down before next pulse
+    const yBase = h-30;
+    const yPeak = h-30 - (peakHere/finalAbs)*(h*0.78);
+    pts.push([x0,yBase],[x1,yPeak],[x2, yBase - (peakHere/finalAbs)*(h*0.78)*0.15]);
+  }
+  glowLine(ctx5, pts, AMBER, AMBER_GLOW);
+  ctx5.fillStyle='#7A8290'; ctx5.font='11px IBM Plex Mono';
+  ctx5.fillText('0 ms', 20, h-12);
+  ctx5.fillText(windowMs+' ms', w-46, h-12);
+}
+
+document.querySelectorAll('#stdp-seg button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('#stdp-seg button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    stdpTon = parseFloat(btn.dataset.ton);
+    stdpToff = parseFloat(btn.dataset.toff);
+    stdpFinal = parseFloat(btn.dataset.final);
+    stdpUnit = btn.dataset.unit;
+    drawSTDP();
+  });
+});
+
+// ================= CH6: Conductance potentiation-depression =================
+const c6 = document.getElementById('canvas-cond');
+const ctx6 = c6.getContext('2d');
+
+function drawConductance(){
+  const w=c6.width, h=c6.height;
+  drawGrid(ctx6, w, h, AMBER_DIM);
+  const pts=[];
+  const N=300;
+  // two bump cycles resembling Fig.8: rise (potentiation), fall (depression), repeat
+  for(let i=0;i<N;i++){
+    const t = i/(N-1); // 0..1 maps to 0..0.05 s
+    const cyclePos = (t*2)%1; // two cycles across width
+    let g;
+    if(cyclePos < 0.35){
+      g = Math.pow(cyclePos/0.35, 1.4); // rising potentiation
+    } else {
+      g = Math.exp(-((cyclePos-0.35)/0.4)*3.5); // relaxing depression
+    }
+    const x = t*w;
+    const y = h-30 - g*(h*0.72);
+    pts.push([x,y]);
+  }
+  glowLine(ctx6, pts, CYAN, CYAN_GLOW);
+  ctx6.fillStyle = '#7A8290'; ctx6.font='11px IBM Plex Mono';
+  ctx6.fillText('Potentiation', w*0.12, 26);
+  ctx6.fillText('Depression', w*0.32, h*0.55);
+  ctx6.fillText('Potentiation', w*0.62, 26);
+  ctx6.fillText('Depression', w*0.82, h*0.55);
+  ctx6.strokeStyle = '#2A3138'; ctx6.beginPath(); ctx6.moveTo(20,h-30); ctx6.lineTo(w-20,h-30); ctx6.stroke();
+}
+
+// ================= CH7: Benchmark table =================
+const benchmarkData = [
+  {ref:'[18]', electrolyte:'SiO₂', metrics:'PPF Index: 111% · EPSC Gain: 101%–139%'},
+  {ref:'[19]', electrolyte:'HfO₂', metrics:'Depression Energy: 2.4 pJ'},
+  {ref:'[20]', electrolyte:'PS-PVA', metrics:'STP Energy: 4.24 nJ (Vd=−1V, Vg=−15V)'},
+  {ref:'[21]', electrolyte:'PEO-LiClO₄', metrics:'STP Energy: 1.25 pJ · PPF Index: 162%'},
+  {ref:'This work', electrolyte:'Ta₂O₅', metrics:'PPF Index: 565% · Depression: 96.18% · STP Energy: 0.31 nJ', highlight:true}
+];
+
+function drawBenchTable(){
+  const tbody = document.getElementById('bench-tbody');
+  tbody.innerHTML = benchmarkData.map(row => `
+    <tr style="border-bottom:1px solid var(--panel-edge); ${row.highlight?'background:rgba(255,170,51,0.07);':''}">
+      <td style="padding:9px 10px; color:${row.highlight?'var(--amber)':'var(--text)'}; font-weight:${row.highlight?'600':'400'};">${row.ref}</td>
+      <td style="padding:9px 10px; color:${row.highlight?'var(--amber)':'var(--text)'};">${row.electrolyte}</td>
+      <td style="padding:9px 10px; color:${row.highlight?'var(--text)':'var(--muted)'};">${row.metrics}</td>
+    </tr>
+  `).join('');
+}
+
+// ---------- init ----------
+drawEPSC();
+drawPPF();
+drawLTP();
+drawDep();
+drawSTDP();
+drawConductance();
+drawBenchTable();
+</script>
+</body>
+</html>
